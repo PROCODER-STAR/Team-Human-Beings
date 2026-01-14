@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Shopping Cart</title>
+</head>
+<body>
+    <h1>Smart Shopping Cart</h1>
+    <hr>
+    <div style="display: flex; flex-direction:row;">
+        <div style="flex: 1; padding: 10px; border-right: 2px solid #ccc;">
+            <h2>Available Products</h2>
+            <div id="products-list"></div>
+        </div>
+        <div style="flex: 1; padding: 10px;">
+            <h2>Your Shopping Cart (<span id="cart-count">0</span> items)</h2>
+            <div id="cart-items"></div>
+            <h3>Total: $<span id="cart-total">0.00</span></h3>
+            <button id="clear-cart-btn">Clear Cart</button>
+        </div>
+    </div>
+    <script src="cart.js"></script>
+</body>
+</html>
