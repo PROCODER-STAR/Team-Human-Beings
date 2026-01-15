@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carpool Connect - Simple & Functional</title>
+    <!-- OpenStreetMap/Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background: #f5f7fa; color: #333; }
+        
+        /* Header */
+        header { 
+            background: linear-gradient(135deg, #2E8B57, #1A5276);
+            color: white; 
+            padding: 20px; 
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        header h1 { font-size: 24px; margin-bottom: 5px; }
+        header p { opacity: 0.9; font-size: 14px; }
+        
+        /* Main Layout */
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        @media (min-width: 768px) {
+            .container { flex-direction: row; }
+            .sidebar { flex: 1; }
+            .main-content { flex: 2; }
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            color: #666;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            color: #2E8B57;
+            border-bottom: 3px solid #2E8B57;
+        }
+        
+        /* Forms */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #444; }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #2E8B57;
+        }
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+        .form-row > * { flex: 1; }
+        
+        /* Buttons */
+        .btn {
+            background: #2E8B57;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #267349; }
+        .btn-secondary { background: #1A5276; }
+        .btn-secondary:hover { background: #154360; }
+        .btn-small { padding: 8px 12px; font-size: 13px; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        
+        /* Map */
+        #map { 
+            height: 300px; 
+            width: 100%; 
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        /* Rides List */
+        .rides-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .ride-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+        }
+        .ride-item:hover { background: #f0f0f0; }
+        .ride-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .ride-route { font-weight: bold; color: #1A5276; }
+        .ride-time { color: #E67E22; font-weight: bold; }
+        .ride-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .seat-indicator {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+        }
+        .seat {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+        }
+        .seat.available { background: #2E8B57; }
+        .seat.booked { background: #ddd; }
+        
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            background: #f0f7f4;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value { font-size: 24px; font-weight: bold; color: #2E8B57; }
+        .stat-label { font-size: 12px; color: #666; }
+        
+        /* Notifications */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #2E8B57;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+        }
+        
+        /* Responsive */
+        @media (max-width: 767px) {
+            .form-row { flex-direction: column; gap: 15px; }
+            .stats { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚗 Carpool Connect</h1>
+        <p>Share rides. Save money. Reduce emissions.</p>
+    </header>
+    
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Post Ride -->
+            <div class="card">
+                <h2 style="margin-bottom: 15px; color: #1A5276;">➕ Post a Ride</h2>
+                <form id="post-ride-form">
+                    <div class="form-group">
+                        <label>From</label>
+                        <input type="text" id="from" placeholder="Start location" required>
+                    </div>
+                    <div class="form-group">
+                        <label>To</label>
+                        <input type="text" id="to" placeholder="Destination" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" id="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Time</label>
+                            <input type="time" id="time" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Seats</label>
+                            <select id="seats">
+                                <option>1</option>
+                                <option selected>2</option>
+                                <option>3</option>
+                                <option>4</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Price ($)</label>
+                            <input type="number" id="price" value="5" min="0" step="1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes (Optional)</label>
+                        <textarea id="notes" rows="2" placeholder="Any additional info"></textarea>
+                    </div>
+                    <button type="submit" class="btn">📤 Post Ride</button>
+                </form>
+            </div>
+            
+            <!-- Stats -->
+            <div class="card">
+                <h2 style="margin-bottom: 15px; color: #1A5276;">📊 Your Impact</h2>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="saved-money">$0</div>
+                        <div class="stat-label">Money Saved</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="reduced-co2">0 kg</div>
+                        <div class="stat-label">CO₂ Reduced</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="shared-rides">0</div>
+                        <div class="stat-label">Rides Shared</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-distance">0 km</div>
+                        <div class="stat-label">Distance Shared</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('find-rides')">🔍 Find Rides</button>
+                <button class="tab" onclick="switchTab('my-rides')">🚗 My Rides</button>
+                <button class="tab" onclick="switchTab('map-view')">🗺️ Map View</button>
+            </div>
+            
+            <!-- Find Rides Tab -->
+            <div id="find-rides" class="tab-content active">
+                <div class="card">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <input type="text" id="search-from" placeholder="Search from...">
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="search-to" placeholder="Search to...">
+                        </div>
+                        <button type="button" class="btn btn-small" onclick="searchRides()">Search</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #1A5276;">Available Rides</h3>
+                    <div id="rides-list" class="rides-list">
+                        <!-- Rides will load here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- My Rides Tab -->
+            <div id="my-rides" class="tab-content" style="display: none;">
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #1A5276;">My Posted Rides</h3>
+                    <div id="my-rides-list" class="rides-list">
+                        <!-- My rides will load here -->
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #1A5276;">My Booked Rides</h3>
+                    <div id="booked-rides-list" class="rides-list">
+                        <!-- Booked rides will load here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Map View Tab -->
+            <div id="map-view" class="tab-content" style="display: none;">
+                <div class="card">
+                    <h3 style="margin-bottom: 15px; color: #1A5276;">Live Carpool Map</h3>
+                    <div id="map"></div>
+                    <div style="margin-top: 10px; font-size: 13px; color: #666;">
+                        <p>📍 Click on markers to see ride details</p>
+                        <p>📍 Green markers: Available rides</p>
+                        <p>📍 Blue markers: Your rides</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // ========== APP STATE ==========
+        let allRides = [];
+        let myRides = [];
+        let bookedRides = [];
+        let userStats = {
+            savedMoney: 0,
+            reducedCO2: 0,
+            sharedRides: 0,
+            totalDistance: 0
+        };
+
+        // Initialize sample rides
+        function initSampleRides() {
+            const tomorrow = getTomorrowDate();
+            return [
+                {
+                    id: 1,
+                    from: "University Campus",
+                    to: "Downtown",
+                    date: tomorrow,
+                    time: "08:30",
+                    seats: 4,
+                    availableSeats: 2,
+                    price: 5,
+                    driver: "Alex Johnson",
+                    notes: "Direct route, no stops",
+                    driverId: "driver1",
+                    fromCoords: [40.7128, -74.0060],
+                    toCoords: [40.7580, -73.9855]
+                },
+                {
+                    id: 2,
+                    from: "Student Dorms",
+                    to: "Shopping Mall",
+                    date: tomorrow,
+                    time: "14:00",
+                    seats: 3,
+                    availableSeats: 1,
+                    price: 3,
+                    driver: "Sam Davis",
+                    notes: "Electric car available",
+                    driverId: "driver2",
+                    fromCoords: [40.7150, -74.0030],
+                    toCoords: [40.7510, -73.9760]
+                }
+            ];
+        }
+        
+        // ========== INITIALIZATION ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load data from localStorage or initialize
+            loadFromStorage();
+            
+            // Set default date to tomorrow
+            document.getElementById('date').value = getTomorrowDate();
+            
+            // Setup form submissions
+            document.getElementById('post-ride-form').addEventListener('submit', postRide);
+            
+            // Initialize map
+            initMap();
+            
+            // Display rides
+            updateAllDisplays();
+            
+            // Show notification
+            showNotification('Carpool system ready! Try posting a ride.');
+        });
+        
+        // ========== DATA MANAGEMENT ==========
+        function loadFromStorage() {
+            // Try to load from localStorage
+            const storedRides = localStorage.getItem('carpoolRides');
+            const storedMyRides = localStorage.getItem('myCarpoolRides');
+            const storedBooked = localStorage.getItem('bookedCarpoolRides');
+            const storedStats = localStorage.getItem('userStats');
+            
+            if (storedRides) {
+                allRides = JSON.parse(storedRides);
+            } else {
+                allRides = initSampleRides();
+                saveToStorage();
+            }
+            
+            if (storedMyRides) {
+                myRides = JSON.parse(storedMyRides);
+            }
+            
+            if (storedBooked) {
+                bookedRides = JSON.parse(storedBooked);
+            }
+            
+            if (storedStats) {
+                userStats = JSON.parse(storedStats);
+                updateStats();
+            }
+        }
+        
+        function saveToStorage() {
+            localStorage.setItem('carpoolRides', JSON.stringify(allRides));
+            localStorage.setItem('myCarpoolRides', JSON.stringify(myRides));
+            localStorage.setItem('bookedCarpoolRides', JSON.stringify(bookedRides));
+            localStorage.setItem('userStats', JSON.stringify(userStats));
+        }
+        
+        // ========== CORE FUNCTIONS ==========
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show selected tab
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabName).style.display = 'block';
+            
+            // Special handling for map tab
+            if (tabName === 'map-view') {
+                setTimeout(() => {
+                    map.invalidateSize();
+                    updateMapMarkers();
+                }, 100);
+            }
+            
+            // Refresh data for the tab
+            updateAllDisplays();
+        }
+        
+        function postRide(e) {
+            e.preventDefault();
+            
+            const from = document.getElementById('from').value.trim();
+            const to = document.getElementById('to').value.trim();
+            
+            if (!from || !to) {
+                showNotification('Please enter both start and destination', 'error');
+                return;
+            }
+            
+            // Generate a unique ID
+            const rideId = Date.now();
+            
+            const newRide = {
+                id: rideId,
+                from: from,
+                to: to,
+                date: document.getElementById('date').value,
+                time: document.getElementById('time').value,
+                seats: parseInt(document.getElementById('seats').value),
+                availableSeats: parseInt(document.getElementById('seats').value),
+                price: parseFloat(document.getElementById('price').value) || 0,
+                driver: "You",
+                notes: document.getElementById('notes').value,
+                driverId: "currentUser",
+                fromCoords: geocodeLocation(from),
+                toCoords: geocodeLocation(to)
+            };
+            
+            // Add to rides
+            allRides.push(newRide);
+            myRides.push({...newRide});
+            
+            // Save to storage
+            saveToStorage();
+            
+            // Update UI
+            updateAllDisplays();
+            
+            // Reset form
+            e.target.reset();
+            document.getElementById('date').value = getTomorrowDate();
+            
+            showNotification(`Ride posted: ${from} → ${to}`);
+            switchTab('find-rides'); // Switch to see the posted ride
+        }
+        
+        function searchRides() {
+            const from = document.getElementById('search-from').value.toLowerCase().trim();
+            const to = document.getElementById('search-to').value.toLowerCase().trim();
+            
+            const filteredRides = allRides.filter(ride => {
+                const matchesFrom = !from || ride.from.toLowerCase().includes(from);
+                const matchesTo = !to || ride.to.toLowerCase().includes(to);
+                const hasSeats = ride.availableSeats > 0;
+                const isNotMyRide = ride.driverId !== "currentUser";
+                
+                return matchesFrom && matchesTo && hasSeats && isNotMyRide;
+            });
+            
+            displayRides(filteredRides, 'rides-list');
+        }
+        
+        function bookSeat(rideId) {
+            const ride = allRides.find(r => r.id === rideId);
+            
+            if (!ride) {
+                showNotification('Ride not found', 'error');
+                return;
+            }
+            
+            if (ride.availableSeats <= 0) {
+                showNotification('No seats available', 'error');
+                return;
+            }
+            
+            // Update seat count
+            ride.availableSeats -= 1;
+            
+            // Add to booked rides
+            const bookedRide = {
+                ...ride,
+                bookingId: Date.now(),
+                bookingDate: new Date().toISOString().split('T')[0],
+                bookedSeats: 1
+            };
+            
+            // Remove if already booked (prevent duplicates)
+            bookedRides = bookedRides.filter(r => r.id !== rideId);
+            bookedRides.push(bookedRide);
+            
+            // Update stats
+            const distance = calculateDistance(ride.fromCoords, ride.toCoords);
+            userStats.savedMoney += ride.price;
+            userStats.reducedCO2 += distance * 0.15; // Approx CO2 savings per km
+            userStats.sharedRides += 1;
+            userStats.totalDistance += distance;
+            
+            // Save and update
+            saveToStorage();
+            updateAllDisplays();
+            
+            showNotification(`Booked seat on ${ride.from} → ${ride.to} for $${ride.price}`);
+        }
+        
+        function cancelRide(rideId) {
+            // Remove from myRides
+            myRides = myRides.filter(r => r.id !== rideId);
+            
+            // Remove from allRides
+            allRides = allRides.filter(r => r.id !== rideId);
+            
+            // Save and update
+            saveToStorage();
+            updateAllDisplays();
+            
+            showNotification('Ride cancelled successfully');
+        }
+        
+        // ========== DISPLAY FUNCTIONS ==========
+        function updateAllDisplays() {
+            updateRidesDisplay();
+            updateMyRidesDisplay();
+            updateBookedRidesDisplay();
+            updateMapMarkers();
+            updateStats();
+        }
+        
+        function updateRidesDisplay() {
+            // Show all rides except user's own rides
+            const availableRides = allRides.filter(ride => 
+                ride.availableSeats > 0 && ride.driverId !== "currentUser"
+            );
+            
+            displayRides(availableRides, 'rides-list');
+        }
+        
+        function updateMyRidesDisplay() {
+            displayRides(myRides, 'my-rides-list', true);
+        }
+        
+        function updateBookedRidesDisplay() {
+            displayRides(bookedRides, 'booked-rides-list', false, true);
+        }
+        
+        function displayRides(rides, containerId, showCancel = false, isBooked = false) {
+            const container = document.getElementById(containerId);
+            
+            if (rides.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">🚗</div>
+                        <div>No rides found</div>
+                        ${containerId === 'rides-list' ? 
+                            '<div style="margin-top: 10px; font-size: 12px;">Post a ride using the form on the left!</div>' : ''}
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = rides.map(ride => {
+                // Create seat indicators
+                const seatsHtml = Array(ride.seats).fill().map((_, i) => {
+                    const isAvailable = i < ride.availableSeats;
+                    return `<div class="seat ${isAvailable ? 'available' : 'booked'}"></div>`;
+                }).join('');
+                
+                // Determine if user can book this ride
+                const canBook = !isBooked && ride.availableSeats > 0 && ride.driverId !== "currentUser";
+                
+                return `
+                    <div class="ride-item" data-id="${ride.id}">
+                        <div class="ride-header">
+                            <div class="ride-route">${ride.from} → ${ride.to}</div>
+                            <div class="ride-time">${formatTime(ride.time)}</div>
+                        </div>
+                        <div class="ride-details">
+                            <div>📅 ${formatDate(ride.date)}</div>
+                            <div>👤 ${ride.driver}</div>
+                        </div>
+                        <div class="ride-details">
+                            <div>💺 ${ride.availableSeats}/${ride.seats} seats • $${ride.price} each</div>
+                            <div>${isBooked ? '✅ Booked' : ''}</div>
+                        </div>
+                        <div class="seat-indicator">${seatsHtml}</div>
+                        ${ride.notes ? `<div style="margin-top: 10px; font-size: 13px; color: #666;">📝 ${ride.notes}</div>` : ''}
+                        <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            ${canBook ? 
+                                `<button class="btn btn-small" onclick="bookSeat(${ride.id})">Book Seat</button>` : ''}
+                            ${showCancel ? 
+                                `<button class="btn btn-small btn-danger" onclick="cancelRide(${ride.id})">Cancel Ride</button>` : ''}
+                            <button class="btn btn-small btn-secondary" onclick="showOnMap(${ride.id})">View on Map</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updateStats() {
+            document.getElementById('saved-money').textContent = `$${userStats.savedMoney}`;
+            document.getElementById('reduced-co2').textContent = `${userStats.reducedCO2.toFixed(1)} kg`;
+            document.getElementById('shared-rides').textContent = userStats.sharedRides;
+            document.getElementById('total-distance').textContent = `${userStats.totalDistance.toFixed(0)} km`;
+        }
+        
+        // ========== MAP FUNCTIONS ==========
+        let map;
+        let markers = [];
+        
+        function initMap() {
+            map = L.map('map').setView([40.7128, -74.0060], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Add user location button
+            L.easyButton('<span style="font-size: 18px;">📍</span>', function() {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function(pos) {
+                        map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+                        L.marker([pos.coords.latitude, pos.coords.longitude])
+                            .addTo(map)
+                            .bindPopup('Your location')
+                            .openPopup();
+                    });
+                }
+            }, 'Find my location').addTo(map);
+        }
+        
+        function updateMapMarkers() {
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            // Add markers for all rides
+            allRides.forEach(ride => {
+                if (!ride.fromCoords) return;
+                
+                const isMyRide = ride.driverId === "currentUser";
+                const hasSeats = ride.availableSeats > 0;
+                
+                // Create custom marker
+                const marker = L.marker(ride.fromCoords, {
+                    icon: L.divIcon({
+                        html: `
+                            <div style="
+                                background: ${isMyRide ? '#1A5276' : hasSeats ? '#2E8B57' : '#e74c3c'}; 
+                                color: white; 
+                                width: 40px; 
+                                height: 40px; 
+                                border-radius: 50%; 
+                                display: flex; 
+                                align-items: center; 
+                                justify-content: center; 
+                                font-size: 18px;
+                                border: 2px solid white;
+                                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                            ">
+                                ${hasSeats ? '🚗' : '⛔'}
+                            </div>
+                        `,
+                        iconSize: [40, 40],
+                        className: 'ride-marker'
+                    })
+                }).addTo(map);
+                
+                // Add popup with ride details
+                marker.bindPopup(`
+                    <div style="min-width: 200px;">
+                        <b>${ride.from} → ${ride.to}</b><br>
+                        <small>${formatDate(ride.date)} at ${formatTime(ride.time)}</small><br>
+                        <hr style="margin: 5px 0;">
+                        👤 Driver: ${ride.driver}<br>
+                        💺 Seats: ${ride.availableSeats}/${ride.seats} available<br>
+                        💰 Price: $${ride.price} per seat<br>
+                        ${ride.notes ? `<br>📝 ${ride.notes}` : ''}
+                        ${ride.availableSeats > 0 && ride.driverId !== "currentUser" ? 
+                            `<br><button onclick="bookSeat(${ride.id}); map.closePopup();" 
+                                style="background: #2E8B57; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-top: 5px; width: 100%;">
+                                Book This Ride
+                            </button>` : ''}
+                    </div>
+                `);
+                
+                markers.push(marker);
+            });
+            
+            // Fit bounds to show all markers
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+        
+        function showOnMap(rideId) {
+            const ride = allRides.find(r => r.id === rideId);
+            if (ride && ride.fromCoords) {
+                switchTab('map-view');
+                setTimeout(() => {
+                    map.setView(ride.fromCoords, 15);
+                    
+                    // Find and open the marker popup
+                    markers.forEach(marker => {
+                        const markerPos = marker.getLatLng();
+                        if (Math.abs(markerPos.lat - ride.fromCoords[0]) < 0.001 && 
+                            Math.abs(markerPos.lng - ride.fromCoords[1]) < 0.001) {
+                            marker.openPopup();
+                        }
+                    });
+                }, 300);
+            }
+        }
+        
+        // ========== HELPER FUNCTIONS ==========
+        function geocodeLocation(address) {
+            const mockLocations = {
+                'university': [40.7128, -74.0060],
+                'campus': [40.7128, -74.0060],
+                'downtown': [40.7580, -73.9855],
+                'dorms': [40.7150, -74.0030],
+                'mall': [40.7510, -73.9760],
+                'airport': [40.6413, -73.7781],
+                'station': [40.7505, -73.9934],
+                'home': [40.7200, -74.0100],
+                'work': [40.7400, -73.9900]
+            };
+            
+            const normalized = address.toLowerCase();
+            for (const key in mockLocations) {
+                if (normalized.includes(key)) {
+                    // Add slight randomness to show different markers
+                    return [
+                        mockLocations[key][0] + (Math.random() - 0.5) * 0.01,
+                        mockLocations[key][1] + (Math.random() - 0.5) * 0.01
+                    ];
+                }
+            }
+            
+            // Default location with some randomness
+            return [
+                40.7128 + (Math.random() - 0.5) * 0.05,
+                -74.0060 + (Math.random() - 0.5) * 0.05
+            ];
+        }
+        
+        function calculateDistance(coords1, coords2) {
+            // Simple distance calculation (approximate)
+            const latDiff = Math.abs(coords1[0] - coords2[0]);
+            const lngDiff = Math.abs(coords1[1] - coords2[1]);
+            return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 111; // Convert to km
+        }
+        
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.background = type === 'error' ? '#e74c3c' : '#2E8B57';
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'Today';
+            const date = new Date(dateString + 'T00:00:00');
+            const today = new Date();
+            const tomorrow = new Date();
+            tomorrow.setDate(today.getDate() + 1);
+            
+            if (date.toDateString() === today.toDateString()) return 'Today';
+            if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+            
+            return date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                weekday: 'short'
+            });
+        }
+        
+        function formatTime(timeString) {
+            if (!timeString) return '';
+            const [hours, minutes] = timeString.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes.padStart(2, '0')} ${ampm}`;
+        }
+        
+        function getTomorrowDate() {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow.toISOString().split('T')[0];
+        }
+        
+        // Make functions globally available
+        window.switchTab = switchTab;
+        window.searchRides = searchRides;
+        window.bookSeat = bookSeat;
+        window.cancelRide = cancelRide;
+        window.showOnMap = showOnMap;
+    </script>
+</body>
+</html>
